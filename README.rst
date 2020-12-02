@@ -2,6 +2,7 @@ Info
 ====
 
 This is a modified version of tailon which adds the following features
+
 * Colour logs added
 * tailing of network files
 
@@ -38,15 +39,13 @@ Compile front End files
 
 If you make any changes to the web interface files (colours, javascript or html), you have to recompile the front end files. You need to read https://tailon.readthedocs.io/en/latest/development.html
 You will need to install the `requirements-dev.txt` packages. `pip install -r requirements-dev.txt` will do it. You then need to run `npm install`.
-```
-pip install -r requirements-dev.txt
-npm install
-```
+
+    pip install -r requirements-dev.txt
+    npm install
 
 You can then compile the front end files using:
-```
-inv webassets --replace
-```
+
+    inv webassets --replace
 
 Seriously, read https://tailon.readthedocs.io/en/latest/development.html
 
