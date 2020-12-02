@@ -1,4 +1,6 @@
 bind: 0.0.0.0:8080      # address and port to bind on
+debug: false
+#log-file: log_file_name.log    #optional log file name to log to
 allow-transfers: true   # allow log file downloads
 follow-names: false     # allow tailing of not-yet-existent files
 relative-root: /tailon  # web app root path (default: '')
@@ -14,3 +16,9 @@ files:
   - '/var/log/nginx/'   # all files in this directory
   - 'cron':             # it's possible to add sub-sections
       - '/var/log/cron*'
+  - '192.168.100.113':  #ip address means its on a remote machine, so we need user and password
+      user: username
+      password: password
+      files:            #files or directories on remote machine
+      - '/var/log/*.log'
+      - '/var/log/nginx/'

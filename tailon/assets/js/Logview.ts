@@ -80,7 +80,8 @@ class LogView {
 
         if (Array.isArray(message)) {
             for (var i=0; i<message.length; i++) {
-                var line = Utils.escapeHtml(message[i]);
+                //var line = Utils.escapeHtml(message[i]); // removed to allow colourizing inline html
+                var line = message[i];
                 line = line.replace(/\n$/, '');
                 spans.push(this.createLogEntrySpan(line));
             }

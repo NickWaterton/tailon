@@ -5,6 +5,9 @@ import logging
 from functools import partial
 from datetime import datetime
 
+from ansi2html import Ansi2HTMLConverter
+from .grcat import colourize
+
 import sockjs.tornado
 from tornado import web, ioloop, process, escape
 from tornado_http_auth import BasicAuthMixin, DigestAuthMixin
@@ -94,11 +97,15 @@ class WebsocketTailon(sockjs.tornado.SockJSConnection):
         self.file_lister = self.application.file_lister
         self.cmd_control = self.application.cmd_control
         self.initial_tail_lines = self.config['tail-lines']
+        
+        self.conv = Ansi2HTMLConverter(inline=True, line_wrap=False)
+        self.cline = colourize()
 
         self.last_stdout_line = []
         self.last_stderr_line = []
 
         self.processes = {
+            'ctail': None,
             'tail': None,
             'grep': None,
             'awk': None,
@@ -109,17 +116,21 @@ class WebsocketTailon(sockjs.tornado.SockJSConnection):
         self.connected = True
 
     def stdout_callback(self, path, stream, data):
-        # log.debug('stdout: %s\n', data.decode('utf8'))
+        # log.debug('stdout: %s\n', [data.decode('utf8')])
         if not self.connected:
             return
 
         data = data.decode('utf8', errors='replace')
+        #log.info([data])
         lines = data.splitlines(True)
-
+        
         if not lines:
             return
-
+        #log.info(lines)
         lines = utils.line_buffer(lines, self.last_stdout_line)
+        if self.processes['ctail'] is not None:
+            lines = self.cline.colour_lines(lines)
+
         self.write_json(lines)
 
     def stderr_callback(self, path, stream, data):
@@ -129,12 +140,13 @@ class WebsocketTailon(sockjs.tornado.SockJSConnection):
 
         data = data.decode('utf8', errors='replace')
         lines = data.splitlines(True)
-
+        
         if not lines:
             return
 
         lines = utils.line_buffer(lines, self.last_stderr_line)
-
+        if self.processes['ctail'] is not None:
+            lines = self.cline.colour_lines(lines)
         if not lines:
             return
 
@@ -175,24 +187,45 @@ class WebsocketTailon(sockjs.tornado.SockJSConnection):
         if not self.file_lister.is_path_allowed(path):
             log.warn('request to unlisted file: %r', path)
             return
+            
+        path_components = path.split('/')
+        if len(path_components) > 2 and utils.is_ipaddress(path_components[1]):
+            ip = path_components.pop(1)
+            path = '/'.join(path_components)
+            log.debug('path is ip file, ip: {}, path: {}'.format(ip, path))
+        else:
+            ip = None
 
         self.killall()
 
         if 'tail' == command['command']:
             n = command.get('tail-lines', self.initial_tail_lines)
-            proc = self.cmd_control.tail(n, path, STREAM, STREAM)
+            proc = self.cmd_control.tail(ip, n, path, STREAM, STREAM)
             self.processes['tail'] = proc
 
             outcb = partial(self.stdout_callback, path, proc.stdout)
             errcb = partial(self.stderr_callback, path, proc.stderr)
             proc.stdout.read_until_close(outcb, outcb)
             proc.stderr.read_until_close(errcb, errcb)
+            
+        elif 'ctail' == command['command']:
+            self.cline.set_cfile(match_name=command['path'])
+            n = command.get('tail-lines', self.initial_tail_lines)
+            regex = command.get('script', '.*')
+            
+            proc_tail, proc_grep = self.cmd_control.ctail(ip, n, path, regex, STREAM, STREAM)
+            self.processes['ctail'], self.processes['grep'] = proc_tail, proc_grep
+
+            outcb = partial(self.stdout_callback, path, proc_grep.stdout)
+            errcb = partial(self.stderr_callback, path, proc_grep.stderr)
+            proc_grep.stdout.read_until_close(outcb, outcb)
+            proc_grep.stderr.read_until_close(errcb, errcb)
 
         elif 'grep' == command['command']:
             n = command.get('tail-lines', self.initial_tail_lines)
             regex = command.get('script', '.*')
 
-            proc_tail, proc_grep = self.cmd_control.tail_grep(n, path, regex, STREAM, STREAM)
+            proc_tail, proc_grep = self.cmd_control.tail_grep(ip, n, path, regex, STREAM, STREAM)
             self.processes['tail'], self.processes['grep'] = proc_tail, proc_grep
 
             outcb = partial(self.stdout_callback, path, proc_grep.stdout)
@@ -204,7 +237,7 @@ class WebsocketTailon(sockjs.tornado.SockJSConnection):
             n = command.get('tail-lines', self.initial_tail_lines)
             script = command.get('script', '{print $0}')
 
-            proc_tail, proc_awk = self.cmd_control.tail_awk(n, path, script, STREAM, STREAM)
+            proc_tail, proc_awk = self.cmd_control.tail_awk(ip, n, path, script, STREAM, STREAM)
             self.processes['tail'], self.processes['awk'] = proc_tail, proc_awk
 
             outcb = partial(self.stdout_callback, path, proc_awk.stdout)
@@ -216,7 +249,7 @@ class WebsocketTailon(sockjs.tornado.SockJSConnection):
             n = command.get('tail-lines', self.initial_tail_lines)
             script = command.get('script', 's|.*|&|')
 
-            proc_tail, proc_sed = self.cmd_control.tail_sed(n, path, script, STREAM, STREAM)
+            proc_tail, proc_sed = self.cmd_control.tail_sed(ip, n, path, script, STREAM, STREAM)
             self.processes['tail'], self.processes['sed'] = proc_tail, proc_sed
 
             outcb = partial(self.stdout_callback, path, proc_sed.stdout)
@@ -230,6 +263,7 @@ class WebsocketTailon(sockjs.tornado.SockJSConnection):
         log.debug('connection closed')
 
     def write_json(self, data):
+        data = [ self.conv.convert(line, full=False, ensure_trailing_newline=False) for line in data if line !='\r']
         return self.send(escape.json_encode(data))
 
 

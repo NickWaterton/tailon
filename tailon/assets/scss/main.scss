@@ -206,7 +206,8 @@ div #command-select {
 
 
 .log-view ::selection {
-  @include selected-placeholder();
+  @include selected-placeholder(darken($tailon-logview-text-color, 10%));
+  //@include selected-placeholder(#9d9fa3);
 }
 
 input::selection {

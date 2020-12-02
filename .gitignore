@@ -1,6 +1,7 @@
 logs
 docs/_build
 .cache
+nickconfig.yaml
 
 # Webassets
 .webassets-cache

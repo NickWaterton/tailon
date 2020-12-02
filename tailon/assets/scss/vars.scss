@@ -19,13 +19,17 @@ $tailon-logview-font-size: 13px;
 //----------------------------------------------------------------------------
 // Colors
 //----------------------------------------------------------------------------
-$tailon-logview-background-color: #1d1f21;
+//$tailon-logview-background-color: #1d1f21;
+// use black instead of grey
+$tailon-logview-background-color: #000000;
 $tailon-logview-text-color: #c5c8c6;
 
 $tailon-logview-notice-background-color: #FF974F;
 $tailon-logview-notice-color: #1d1f21;
 
-$tailon-logview-current-line-background-color: #282a2e;
+//$tailon-logview-current-line-background-color: #282a2e;
+// use black instead of grey
+$tailon-logview-current-line-background-color: #000000;
 
 $tailon-toolbar-background-color: #282a2e;
 $tailon-toolbar-input-background-color: #373b41;

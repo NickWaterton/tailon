@@ -1,6 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8; -*-
 
+#to compile front end assets see https://tailon.readthedocs.io/en/latest/development.html
+'''
+install pip packages from requirements-dev.txt
+possibly sudo apt install nodejs-dev node-gyp libssl1.0-dev
+sudo apt install npm
+
+cd tailon-legacy
+npm install
+
+I just want to make a small change to the frontend code or styles. What do I do?
+
+Modify the typescript or scss files in tailon/assets and run:
+
+# Compile and minify SCSS; Concatenate and minify JS.
+$ inv webassets --replace
+
+# Without minifying and concatenating JS (usefuly for debugging).
+$ inv webassets --replace --debug
+Adding or updating a third-party dependency:
+
+# Run after adding the dependency to the bower.json file.
+$ bower install
+$ inv collectstatic  # Copies from bower_components to tailon/assets/vendor.
+$ inv webassets --replace --no-expire
+'''
+
 from __future__ import print_function
 from __future__ import absolute_import
 
@@ -25,9 +51,11 @@ from . import utils
 #-----------------------------------------------------------------------------
 # Setup Logging
 #-----------------------------------------------------------------------------
+global log
 log = logging.getLogger()
 ch = logging.StreamHandler()
 ft = logging.Formatter('[+%(relativeCreated)f][%(levelname)5s] %(message)s')
+#ft = logging.Formatter('[%(levelname)1.1s %(asctime)s] (%(name)-20s) %(message)s')
 
 ch.setFormatter(ft)
 ch.setLevel(logging.DEBUG)
@@ -52,20 +80,34 @@ def enable_debugging():
     log.setLevel(logging.DEBUG)
     applog.setLevel(logging.DEBUG)
     weblog.setLevel(logging.DEBUG)
-
+    
+def setup_logger(log_file=None):
+    try:
+        formatter = logging.Formatter('[%(levelname)1.1s %(asctime)s] (%(name)-20s) %(message)s')
+        if log_file:
+            fileHandler = logging.handlers.RotatingFileHandler(log_file, mode='a', maxBytes=2000000, backupCount=5)
+            fileHandler.setFormatter(formatter)
+            log.addHandler(fileHandler)
+             
+    except Exception as e:
+        log.info("Error in Logging setup: %s - do you have permission to write the log file??" % e)
+        sys.exit(1)
 
 #-----------------------------------------------------------------------------
 def parseconfig(cfg):
     import yaml
 
-    raw_config = yaml.load(cfg)
+    raw_config = yaml.safe_load(cfg)
+    
+    print('raw-config: {}'.format(raw_config))
 
     port, addr = utils.parseaddr(raw_config.get('bind', 'localhost:8080'))
     config = {
         'port': port,
         'addr': addr,
         'debug': raw_config.get('debug', False),
-        'commands': raw_config.get('commands', ['tail', 'grep', 'awk']),
+        'log-file': raw_config.get('log-file'),
+        'commands': raw_config.get('commands', ['ctail', 'tail', 'grep', 'awk']),
         'allow-transfers': raw_config.get('allow-transfers', False),
         'follow-names':    raw_config.get('follow-names', False),
         'relative-root':   raw_config.get('relative-root', '/'),
@@ -90,21 +132,49 @@ def parseconfig(cfg):
 
     files = config['files'] = collections.OrderedDict()
     files['__ungrouped__'] = []
-
+    
     def helper(el, group='__ungrouped__', indict=False):
+        '''
+        convert directories to list of files
+        populate dictionary 'files' with '__ungrouped__' file list or 'group' file list
+        '''
+        global file_utils
         for paths_or_group in el:
             if isinstance(paths_or_group, dict):
+                #group
                 if indict:
                     raise RuntimeError('more than two sub-levels under "files"')
                 group_name, j = list(paths_or_group.items())[0]
-                helper(j, group_name, True)
+                log.info('group: {}, j: {}'.format(group, j))
+                if isinstance(j, dict):
+                    user = j.get('user')
+                    password = j.get('password')
+                    if user and password:
+                        config.setdefault('logins', {})
+                        config['logins'][group_name]= (user, password)
+                        file_utils = utils.FileUtils(login=(user, password), use_directory_cache=True)
+                        helper(j.get('files', []), group_name, True)
+                else:
+                    helper(j, group_name, True)
                 continue
-            for path in glob.glob(paths_or_group):
-                if not os.access(path, os.R_OK):
-                    log.info('skipping unreadable file: %r', path)
-                    continue
-                d = files.setdefault(group, [])
-                d.append(path)
+            
+            elif utils.is_ipaddress(group):
+                #ip address group
+                for path in file_utils.listdir_netpath(group, paths_or_group, files_only=True):
+                    d = files.setdefault(group, [])
+                    if paths_or_group not in d and paths_or_group.endswith('/'):
+                        d.append(paths_or_group)    #add directory path
+                    log.info('adding: {}'.format(path))
+                    d.append(path)
+                
+            else:
+                #no group - it's a pathname
+                for path in glob.glob(paths_or_group):
+                    if not os.access(path, os.R_OK):
+                        log.info('skipping unreadable file: %r', path)
+                        continue
+                    d = files.setdefault(group, [])
+                    d.append(path)
 
     raw_config['files'] = conservative_merger.merge(raw_config['files'], extra_files)
     helper(raw_config['files'])
@@ -196,8 +266,8 @@ def parseopts(args=None):
         help='number of lines to tail initially')
 
     arg('-m', '--commands', nargs='*', metavar='cmd',
-        choices=commands.ToolPaths.command_names, default=['tail', 'grep', 'awk'],
-        help='allowed commands (default: tail grep awk)')
+        choices=commands.ToolPaths.command_names, default=['ctail', 'tail', 'grep', 'awk'],
+        help='allowed commands (default: ctail tail grep awk)')
 
     #-------------------------------------------------------------------------
     group = parser.add_argument_group('User-interface options')
@@ -280,11 +350,14 @@ def main(argv=sys.argv):
         sys.exit(1)
 
     config = setup(opts)
+    
+    if config.get('log-file'):
+        setup_logger(config['log-file'])
 
     if config['debug']:
         enable_debugging()
 
-    file_utils = utils.FileUtils(use_directory_cache=True)
+    file_utils = utils.FileUtils(login=config.get('logins'), use_directory_cache=True)
     file_lister = utils.FileLister(file_utils, config['files'], config['follow-names'])
 
     # TODO: Need to handle situations in which only readable, empty
@@ -309,7 +382,8 @@ def main(argv=sys.argv):
     template_dir, assets_dir = get_resource_dirs()
 
     toolpaths = commands.ToolPaths()
-    cmd_control = commands.CommandControl(toolpaths, config['follow-names'])
+    #cmd_control = commands.CommandControl(toolpaths, config['follow-names'])
+    cmd_control = commands.CommandControl(toolpaths, config)
 
     application = server.TailonApplication(
         config, client_config, template_dir, assets_dir,

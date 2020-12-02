@@ -1,0 +1,195 @@
+# this configuration file is suitable for displaying openhab log files
+
+
+# example of text substitution
+#regexp=\bda?emon
+#replace=angel
+#colours=red
+#======
+# example of text substitution
+#regexp=(\d\d):(\d\d):(\d\d)
+#replace=\1h\2m\3s
+#======
+#regex notes:
+# regexes are applied in order, top down, so earlier ones get overriden by later ones. Order is important!
+# \W (non-word character) is equivalent to [^a-zA-Z0-9_]  \w is [a-zA-Z0-9_]
+# \S (non-white space)    is equivalent to [^\r\n\t\f\v ] \s is [\r\n\t\f\v ]
+# \D (non-digit)          is equivalent to [^0-9]         \d is [0-9]
+# ? is zero to 1 times
+# + is one to unlimited times
+# * is zero to unlimited times
+# {3,6} between 3 and 6 of previous, also {3} exactly 3, {3,} 3 or more
+# . is any character except line terminators
+# \ makes the next character literal eg \. is . not any character
+# {?i) at the beginning of a line (can only go at the beginning) makes the line case insensitive
+# allowed modifiers (?imsxXU) using a - toggles the behaviours (eg (?-i) makes the line case sensitive)
+
+#see https://github.com/pengwynn/grc for more details
+# colors are by regex group 0, 1, 2 etc, you can use bold, blink, underline, previous, unchanged, default
+#                                                    colour, bright_colour or string in '' eg "\033[38;5;22m" 
+#                                                    is index 22 in a 256 colour palette (in this case dark green) and "\033[38;2;255;255;0m" is rbg (255,255,0)
+#                                                    38 is foreground colour, 48 is background colour
+# IMPORTANT!: colour groups 0 matches the whole regex, so \W(green) group 0 is 'green -green !green etc. to make just the word 'green' green
+#             the colour would be default, green this makes group 0 default (which is NOT white, but grey), and group 1 green.
+#             Also, if you have multiple groups, group 0 matches the whole thing (spaces you cant see the colour of), but if you add
+#             less colour groups than you have, the rest will be default colour...
+#             eg \W(store(d|ing)?) is two groups plus 0, so you need to use default, blue, blue to match.
+#             (I will fix this... OK fixed, last colour is used for all subsequent matches)
+#             You can use non matching groups (?:xxx) to consolidate, but this is tricky. 
+# count is one of words: once, more, stop, previous, block or unblock (block makes everything the defined colour until you match an unblock regex)
+
+#test out your regex at https://regex101.com/ first!
+
+# display this line in yellow and stop further processing
+regexp=.*last message repeated \d+ times$
+colours=bright_yellow
+count=stop
+======
+# numbers (has to go before date, or dates will be coloured as numbers...)
+#regexp=[\W\s]([+-]?\d+(\.?\d+)?)\W
+regexp=[\s:=></'\"(]([+-]?\.?\d+(?:[eE]?\.?[+-]?\d|,\d{1,3})*)
+colours=default, green
+count=more
+======
+# this is iso date
+regexp=(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])[T ]?(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]+)?(Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?([+-]\d{4})?
+colours=bright_blue
+count=more
+======
+# this is date with words
+regexp=(\w{0,3} ){0,2}\d{1,2} \d{2}:\d{2}:\d{2}( \d{4}\s)
+colours=bright_blue
+count=more
+#======
+# this is date
+#regexp=^... (\d| )\d \d\d:\d\d:\d\d(\s[\w\d]+?\s)
+#colours=green, green, red
+#count=once
+#======
+# this is date in one of my logging formats
+regexp=^...(\d{2,4}.\d{1,2}.\d{1,2}.\d{1,2}:\d{1,2}:\d{1,2}(.\d+)?)
+colours=default, green, red
+count=once
+#======
+# this is alternate date
+regexp=^(\d{1,2}.\w{3}.\d{2,4}.)?(\d{2,4}-\d\d-\d\d.?)?(\d\d:\d\d:\d\d)(.\d{3})?
+colours=green, green, green, green, red
+count=once
+======
+# test
+#regexp=RRD4jService
+#colours=cyan
+#count=block
+======
+# test
+#regexp=MapDBPersistenceService
+#colours=blue
+#count=unblock
+======
+#words by colours
+# green (case insensitive)
+regexp=(?i)\W(green|true|yes|ok|open|active|on(-?line)?|accept(ed)?|allow(ed)?|enabled?|connect(ed)?|exit(ed)?|success(fully|ful)?|succeed(ed)?|correct(ed)?)
+colours=default, green
+count=more
+======
+# yellow (bright because yellow is dim, and looks orange anyway) (case insensitive)
+regexp=(?i)\W(caught signal [0-9]+|cannot|(connection (to (remote host|[a-z0-9.]+) )?|confirmed|pending|paused?|closed?|terminated?|stop(ped)?|not responding)|exit(ed)?|no more [A-Za-z]+ available|unexpected|(command |binary |file )?not found|(o)+ps|out of (space|memory)|low (memory|disk)|unknown|disabled|deprecated|refused|disconnect(ed|ion)?|attention|warnings?|exclamation|alerts?|could not|unable to|yellow|none|false|heartbeat|warn(ings?)?|off(-?line)?)
+colours=default, bright_yellow
+count=more
+======
+# red (bright because red is dim) (case insensitive)
+regexp=(?i)[^A-Za-z_&-](((bad|wrong|in|invalid|unsupported)( file| memory)? (descriptor|alloc(ation)?|addr(ess)?|owner(ship)?|arg(ument)?|param(eter)?|setting|length|filename)|not properly|improperly|(operation |connection |authentication |access |permission )?(denied|disallowed|not allowed|refused|problem|fail(ed|ure)?|not permitted)|not? found|invalid|unsupported|not supported|seg(mentation )?fault|corrupt(ed|ion)?)|red|overflow|underrun|not ok|unimplemented|unsuccessful(ly)?|not implemented|errors?)[^A-Za-z_-]
+colours=default, bright_red
+count=more
+======
+# blue (bright because blue is very dim) (case insensitive)
+regexp=(?i)[^A-Za-z_&-](blue|stor(ed|e|ing)|debug)[^A-Za-z_&-]
+colours=default, bright_blue
+count=more
+======
+# magenta (case insensitive)
+regexp=(?i)[^0-9A-Za-z_&-](localhost|null|none|undef|unlock(ed|ing)?)[^0-9A-Za-z_-]
+colours=default, magenta
+count=more
+======
+# cyan (bright because blue is very dim) (case insensitive)
+regexp=(?i)[^A-Za-z_&-](last (failed )?login:|launching|checking|lock(ed|ing)?|load(ed|ing)?|execut(e|ing)|creat(e|ing)|build(ing)?|important|boot(ed|ing)?|start(ed|ing)?|notice|information(al)?|note|info|\!\w)[^A-Za-z_-]
+colours=default, cyan
+count=more
+======
+# this is probably a pathname
+regexp=\s(/[\w/]+(\w\..+)?)\s
+colours=default, bold green
+count=more
+======
+# url
+regexp=(?i)[^A-Za-z_&-]((https?|rtsp|wss?)://[A-Za-z0-9_./&?=%~#{}()@+-:]+)[^A-Za-z0-9_-]
+colours=default, underline bold green
+count=more
+======
+# ip number
+regexp=\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}
+colours=bold magenta
+count=more
+======
+# MAC address
+regexp=[\s:](([0-9a-fA-F][0-9a-fA-F]:?){6})\s
+colours=default, bold magenta
+count=more
+======
+# highlight routine name
+regexp=(?i)\|\s*(\w*):
+colours=default, white
+count=once
+======
+# highlight class name (but not if all numbers)
+regexp=(?i)(?!\d+)([\w\. ]+)\]
+colours=default, white
+count=more
+======
+# anything starting with connect (case insensitive)
+regexp=(?i)(connect(ing|ed|ion)?)
+colours=default, black on_green
+count=more
+======
+# anything starting with disconnect (case insensitive)
+regexp=(?i)((not?|dis).?connect(ing|ed|ion)?)
+colours=default, black on_red
+count=more
+======
+# anything starting with reconnect (case insensitive)
+regexp=(?i)(re.?connect(ing|ed|ion)?)
+colours=default, black on_yellow
+count=more
+# Error log info, debug, warning, error, critical
+======
+# info (case insensitive)
+regexp=(?i)(?:^\[(i))|(info)
+colours=default, cyan
+count=once
+======
+# debug (case insensitive)
+regexp=(?i)(?:^\[(d))|(debug)
+colours=default, bright_blue
+count=once
+======
+# anything starting with warn (case insensitive)
+regexp=(?i)(?:^\[(w))|(warn(?:ing|i)?)
+colours=default, bright_yellow
+count=once
+======
+# error (case insensitive)
+regexp=(?i)(?:^\[(e))|(error)
+colours=default, bright_red
+count=once
+======
+# critical (case insensitive)
+regexp=(?i)(?:^\[(c))|(crit(?:ical|i)?)
+colours=default, blink bold bright_red
+count=once
+======
+# words to ignore (case insensitive)
+regexp=(?i)\W(office|(off|on|mid)-peak|openhab[23]?)
+colours=default
+count=more
+======

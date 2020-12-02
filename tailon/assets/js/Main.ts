@@ -329,7 +329,8 @@ class ScriptInput {
         this.placeholders = {
             'awk': '{print $0; fflush()}',
             'sed': 's/.*/&/',
-            'grep': '.*'
+            'grep': '.*',
+            'ctail': '.*'
         }
 
         let current_cmd: string = settings.get('currentCommand');
