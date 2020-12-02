@@ -38,7 +38,8 @@ Compile front End files
 =======================
 
 If you make any changes to the web interface files (colours, javascript or html), you have to recompile the front end files. You need to read https://tailon.readthedocs.io/en/latest/development.html
-You will need to install the `requirements-dev.txt` packages. `pip install -r requirements-dev.txt` will do it. You then need to run `npm install`.
+You will need to install the `requirements-dev.txt` packages.
+commands::
 
     pip install -r requirements-dev.txt
     npm install
