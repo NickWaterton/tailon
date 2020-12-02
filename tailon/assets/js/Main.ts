@@ -29,7 +29,7 @@ let settings = new Settings.Settings({
 
     // Logview tunables.
     wrapLines: window.clientConfig['wrap-lines-initial'],
-    linesOfHistory: 2000,  // 0 for infinite history.
+    linesOfHistory: 500000,  // was 2000 now 500000, 0 for infinite history.
     linesToTail: window.clientConfig['tail-lines-initial'],  // i.e. tail -n $linesToTail.
 
     currentCommand: null,
@@ -67,7 +67,7 @@ backend.onConnect.addCallback(function() {
 });
 
 backend.onDisconnect.addCallback(function() {
-    spinner = new Spinner();
+    spinner = new Spinner({color: '#ffffff'});
     spinner.spin();
     document.body.appendChild(spinner.el);
 })

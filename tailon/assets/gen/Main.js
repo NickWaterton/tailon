@@ -303,7 +303,7 @@ var settings = new Settings.Settings({
     panelHidden: false,
     // Logview tunables.
     wrapLines: window.clientConfig['wrap-lines-initial'],
-    linesOfHistory: 2000,
+    linesOfHistory: 500000,
     linesToTail: window.clientConfig['tail-lines-initial'],
     currentCommand: null,
     currentFile: null,
@@ -326,7 +326,7 @@ backend.onConnect.addCallback(function () {
     spinner.stop();
 });
 backend.onDisconnect.addCallback(function () {
-    spinner = new Spinner();
+    spinner = new Spinner({ color: '#ffffff' });
     spinner.spin();
     document.body.appendChild(spinner.el);
 });
